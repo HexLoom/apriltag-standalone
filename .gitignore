@@ -1,0 +1,47 @@
+# Keil MDK build output
+*.axf
+*.bak
+*.hex
+*.bin
+*.elf
+*.map
+*.lst
+*.iex
+*.lnp
+*.sct
+
+# Keil project generated files
+*.plg
+*.tra
+*.crf
+*.d
+*.o
+*.dep
+*.htm
+*.tmp
+*.log
+*.tra
+
+# Keil-specific folders
+Objects/
+Listings/
+DebugConfig/
+
+# User-generated folders (common custom ones)
+MDK-ARM/output/
+MDK-ARM/.vscode/
+
+# VSCode settings (if you also use VSCode)
+.vscode/
+
+# Backup files (general)
+*~
+*.swp
+*.swo
+*.bak
+*.old
+*.orig
+
+# Git specific
+.DS_Store
+Thumbs.db

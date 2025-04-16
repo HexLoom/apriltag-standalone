@@ -1,0 +1,23 @@
+{
+    "AprilTagConfig": {
+        "family": "tag36h11",      
+        "size": 0.1,               
+        "threads": 2,
+        "max_hamming": 0,          
+        "z_up": false,              
+
+        "decimate": 1.0,           
+        "blur": 1.0,               
+        "refine_edges": 1,         
+        "debug": 0                 
+    },
+
+    "Archive": {
+        "enable": false,
+        "preview": true,
+        "preview_delay": 3000,     
+        "save_raw": false,
+        "save_pred": true,
+        "path": "./data/apriltag"
+    }
+}
