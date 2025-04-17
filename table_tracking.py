@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # 导入AprilTag检测器
-from apriltag import Detector, DetectorOptions, draw_detection_results
+from lib.detector import Detector, DetectorOptions, draw_detection_results
 
 # ================== 工具函数 ==================
 def read_json(file_path):
