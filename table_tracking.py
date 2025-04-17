@@ -87,7 +87,7 @@ def main():
         create_dirs_if_not_exist(archive_config.path)
     
     print("开始AprilTag跟踪...")
-    print("按 'q' 键退出，按 'i' 键手动初始化系统")
+    print("按 'q' 键退出，按 'i' 键手动初始化系统，按 'k' 键切换卡尔曼滤波，按 'p' 键切换平面约束")
     
     try:
         while True:
@@ -130,6 +130,14 @@ def main():
                             print("手动初始化成功！")
                         else:
                             print("手动初始化失败，请确保所有标签可见。")
+                elif key == ord('k'):
+                    # 切换卡尔曼滤波状态
+                    tracker.use_kalman = not tracker.use_kalman
+                    print(f"卡尔曼滤波已{'开启' if tracker.use_kalman else '关闭'}")
+                elif key == ord('p'):
+                    # 切换平面约束状态
+                    tracker.apply_plane_constraint = not tracker.apply_plane_constraint
+                    print(f"平面约束已{'开启' if tracker.apply_plane_constraint else '关闭'}")
     
     except KeyboardInterrupt:
         print("程序被用户中断")
