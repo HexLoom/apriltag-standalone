@@ -142,8 +142,21 @@ class TableVisualizer:
                 'gray', linewidth=1, alpha=0.5)
             self.table_lines.append(line)
 
-    def update(self, tag_poses, moving_tag_id, reference_tags):
-        """更新3D显示"""
+    def update(self, tag_poses, moving_tag_id=None, reference_tags=None):
+        """更新3D显示
+        
+        Args:
+            tag_poses: 标签位姿字典 {tag_id: (position, rotation_matrix)}
+            moving_tag_id: 单个移动标签ID（向后兼容）
+            reference_tags: 参考标签ID列表
+        """
+        # 检查参数兼容性
+        moving_tags = []
+        if isinstance(moving_tag_id, list):
+            moving_tags = moving_tag_id
+        elif moving_tag_id is not None:
+            moving_tags = [moving_tag_id]
+        
         # 检查是否需要调整坐标范围
         self.update_axis_limits(tag_poses)
         if self.needs_axis_update:
@@ -162,33 +175,47 @@ class TableVisualizer:
 
         # 分离参考标签和移动标签
         reference_tags_poses = {id: pose for id, pose in tag_poses.items() 
-                              if id in reference_tags}
+                             if reference_tags and id in reference_tags}
         
         # 绘制桌面
         self.draw_table(reference_tags_poses)
         
+        # 移动标签的颜色列表（用于区分不同的移动标签）
+        moving_tag_colors = ['magenta', 'red', 'orange', 'yellow', 'purple', 'pink']
+        
+        # 轨迹历史记录 {tag_id: [positions]}
+        if not hasattr(self, 'tag_track_history'):
+            self.tag_track_history = {}
+            self.tag_track_lines = {}
+        
         # 绘制每个标签
         for tag_id, (t, R) in tag_poses.items():
-            if tag_id == moving_tag_id:  # 特殊处理移动标签
-                color = 'magenta' # 移动标签颜色
+            if tag_id in moving_tags:  # 移动标签
+                # 根据标签在移动标签列表中的索引选择颜色
+                color_index = moving_tags.index(tag_id) % len(moving_tag_colors)
+                color = moving_tag_colors[color_index]
                 axis_scale = 0.1 # 坐标轴长度
                 scatter_size = 100 # 位置点大小
                 
                 # 记录移动标签轨迹
-                self.track_history.append(t.copy())
-                if len(self.track_history) > 100:  # 限制历史长度
-                    self.track_history.pop(0)
+                if tag_id not in self.tag_track_history:
+                    self.tag_track_history[tag_id] = []
+                
+                self.tag_track_history[tag_id].append(t.copy())
+                if len(self.tag_track_history[tag_id]) > 100:  # 限制历史长度
+                    self.tag_track_history[tag_id].pop(0)
                     
                 # 更新轨迹线
-                if self.track_line:
-                    self.track_line.remove()
-                if len(self.track_history) > 1:
-                    track_array = np.array(self.track_history)
-                    self.track_line, = self.ax.plot3D(
+                if tag_id in self.tag_track_lines and self.tag_track_lines[tag_id]:
+                    self.tag_track_lines[tag_id].remove()
+                
+                if len(self.tag_track_history[tag_id]) > 1:
+                    track_array = np.array(self.tag_track_history[tag_id])
+                    self.tag_track_lines[tag_id], = self.ax.plot3D(
                         track_array[:, 0], track_array[:, 1], track_array[:, 2],
-                        'red', linewidth=1, alpha=0.5)
+                        color, linewidth=1, alpha=0.5)
             else:
-                color = 'cyan' # 其他标签颜色
+                color = 'cyan' # 参考标签颜色
                 axis_scale = 0.05 # 坐标轴长度
                 scatter_size = 70 # 位置点大小
                 
@@ -221,7 +248,7 @@ class TableVisualizer:
 
             # 添加标签ID (使用英文)
             text = self.ax.text(t[0], t[1], t[2]+0.03, str(tag_id),
-                              color='black', fontsize=10, ha='center')
+                             color='black', fontsize=10, ha='center')
             self.texts.append(text)
 
         # 刷新图形

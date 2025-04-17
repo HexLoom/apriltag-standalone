@@ -5,18 +5,14 @@
 桌面AprilTag跟踪系统
 
 这个程序用于跟踪桌面上的多个AprilTag标签，包括四个角落固定的参考标签(ID 0-3)
-以及一个可移动的标签(ID 4)。程序会计算移动标签相对于参考标签的位置，
-并使用3D可视化展示所有标签的空间关系。
+以及多个可移动的标签(默认ID 4,5,6等)。程序支持拍照初始化，即使某些标签被遮挡，
+也能根据已知标签的空间关系估计被遮挡标签的位置。
 
 使用方法:
-    python table_tracking.py [--camera CAMERA_ID] [--config CONFIG_PATH]
+    python table_tracking.py [--config CONFIG_PATH]
 
 参数:
-    --camera: 相机设备ID (默认: 0)
     --config: 配置文件路径 (默认: config/vision/table_setup.json)
-    --camera_info: 相机参数文件 (默认: config/camera/camera_info_1.yaml)
-    --width: 相机宽度 (默认: 1280)
-    --height: 相机高度 (默认: 720)
 """
 
 import argparse
@@ -37,21 +33,20 @@ from lib.detector import Detector, DetectorOptions, draw_detection_results
 def main():
     # 命令行参数解析
     parser = argparse.ArgumentParser(description='桌面AprilTag跟踪系统')
-    parser.add_argument('--camera', type=int, default=0,
-                       help='相机设备ID (默认: 0)')
     parser.add_argument('--config', default='config/vision/table_setup.json',
                        help='配置文件路径 (默认: config/vision/table_setup.json)')
-    parser.add_argument('--camera_info', default='config/camera/camera_info_1.yaml',
-                       help='相机参数文件 (默认: config/camera/camera_info_1.yaml)')
-    parser.add_argument('--width', type=int, default=1280,
-                       help='相机宽度分辨率 (默认: 1280)')
-    parser.add_argument('--height', type=int, default=720,
-                       help='相机高度分辨率 (默认: 720)')
     args = parser.parse_args()
 
     # 加载配置
-    apriltag_config, archive_config, table_config, K, D = load_config(args.config, args.camera_info)
-
+    apriltag_config, camera_config, archive_config, table_config, K, D = load_config(args.config)
+    
+    # 输出配置信息
+    print(f"参考标签ID: {table_config.reference_tags}")
+    print(f"移动标签ID: {table_config.moving_tags}")
+    print(f"系统是否需要初始化: {table_config.require_initialization}")
+    print(f"相机ID: {camera_config.device_id}")
+    print(f"相机分辨率: {camera_config.width}x{camera_config.height}")
+    
     # 初始化可视化
     visualizer = TableVisualizer()
 
@@ -77,22 +72,22 @@ def main():
     )
     
     # 初始化相机
-    print(f"打开相机 ID: {args.camera}...")
-    cap = cv2.VideoCapture(args.camera)
+    print(f"打开相机 ID: {camera_config.device_id}...")
+    cap = cv2.VideoCapture(camera_config.device_id)
     if not cap.isOpened():
-        print(f"无法打开相机 {args.camera}")
+        print(f"无法打开相机 {camera_config.device_id}")
         sys.exit(1)
     
     # 设置相机分辨率
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, camera_config.width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_config.height)
     
     # 创建存档目录
     if archive_config.enable:
         create_dirs_if_not_exist(archive_config.path)
     
     print("开始AprilTag跟踪...")
-    print("按 'q' 键退出")
+    print("按 'q' 键退出，按 'i' 键手动初始化系统")
     
     try:
         while True:
@@ -115,7 +110,7 @@ def main():
             )
             
             # 更新3D可视化
-            visualizer.update(tag_poses, table_config.moving_tag, table_config.reference_tags)
+            visualizer.update(tag_poses, table_config.moving_tags, table_config.reference_tags)
             
             # 显示结果
             if archive_config.preview:
@@ -123,6 +118,18 @@ def main():
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
+                elif key == ord('i'):
+                    print("手动触发系统初始化...")
+                    # 等待1秒确保相机稳定
+                    time.sleep(1)
+                    # 读取新的一帧并初始化
+                    ret, init_frame = cap.read()
+                    if ret:
+                        success = tracker.initialize_system(init_frame)
+                        if success:
+                            print("手动初始化成功！")
+                        else:
+                            print("手动初始化失败，请确保所有标签可见。")
     
     except KeyboardInterrupt:
         print("程序被用户中断")

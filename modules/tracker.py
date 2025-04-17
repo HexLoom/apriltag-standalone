@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 import os
 from modules.utils import matrix_to_quaternion, create_dirs_if_not_exist
+from modules.reference import TableReference
 
 class TableTracker:
     def __init__(self, detector, camera_matrix, dist_coeffs, apriltag_config, table_config, archive_config=None):
@@ -31,6 +32,15 @@ class TableTracker:
         self.table_config = table_config
         self.archive_config = archive_config
         
+        # 初始化参考系统
+        self.reference = TableReference(
+            reference_tag_ids=table_config.reference_tags,
+            moving_tag_ids=table_config.moving_tags
+        )
+        
+        # 初始化标志
+        self.initialized = False
+        
         # 数据记录文件
         if archive_config and archive_config.enable:
             # 创建存档目录
@@ -47,6 +57,30 @@ class TableTracker:
         else:
             self.csv_path = None
     
+    def initialize_system(self, frame):
+        """拍照初始化系统，为后续跟踪建立参考
+        
+        Args:
+            frame: 输入的相机图像帧
+            
+        Returns:
+            bool: 是否成功初始化
+        """
+        print("开始系统初始化...")
+        
+        # 获取当前帧标签位姿
+        tag_poses = self.get_tag_poses(frame)
+        
+        # 尝试初始化参考系统
+        if self.reference.initialize(tag_poses):
+            self.initialized = True
+            self.table_config.initialized = True
+            print("系统初始化成功！可以开始跟踪")
+            return True
+        else:
+            print("系统初始化失败，请确保参考标签和移动标签在视野中")
+            return False
+    
     def process_frame(self, frame):
         """处理一帧图像，返回处理结果
         
@@ -59,6 +93,11 @@ class TableTracker:
             output_image: 可视化结果图像
             fps: 处理帧率
         """
+        # 如果系统尚未初始化且需要初始化
+        if not self.initialized and self.table_config.require_initialization:
+            # 尝试初始化
+            self.initialize_system(frame)
+        
         # 转换为灰度图
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
@@ -127,17 +166,42 @@ class TableTracker:
             cv2.putText(output_image, f"ID:{tag.tag_id}", (center[0], center[1]), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
+        # 如果系统已初始化，处理标签遮挡
+        if self.initialized:
+            # 尝试更新移动标签之间的相对关系
+            self.reference.update_moving_relations(tag_poses)
+            
+            # 估计被遮挡标签的位姿
+            complete_tag_poses = self.reference.compute_missing_tags(tag_poses)
+            
+            # 标记哪些标签是估计的（在图像中没有检测到）
+            estimated_tags = [tag_id for tag_id in complete_tag_poses.keys() if tag_id not in tag_poses]
+            
+            # 使用完整的位姿集
+            tag_poses = complete_tag_poses
+            
+            # 添加估计标签的标记（在图像中没有，但估计了位置）
+            for tag_id in estimated_tags:
+                cv2.putText(output_image, f"Estimated ID:{tag_id}", (10, 90 + 30 * (tag_id - estimated_tags[0])), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        
         # 检查是否找到移动标签
-        if self.table_config.moving_tag in tag_poses:
-            moving_tag_pose = tag_poses[self.table_config.moving_tag]
-            # 计算并显示距离信息
-            position_text = f"Mobile tag (ID:{self.table_config.moving_tag}) location: "
-            position_text += f"X:{moving_tag_pose[0][0]:.2f} Y:{moving_tag_pose[0][1]:.2f} Z:{moving_tag_pose[0][2]:.2f}"
-            cv2.putText(output_image, position_text, (10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        for idx, moving_tag_id in enumerate(self.table_config.moving_tags):
+            if moving_tag_id in tag_poses:
+                moving_tag_pose = tag_poses[moving_tag_id]
+                # 计算并显示距离信息
+                position_text = f"移动标签 (ID:{moving_tag_id}) 位置: "
+                position_text += f"X:{moving_tag_pose[0][0]:.2f} Y:{moving_tag_pose[0][1]:.2f} Z:{moving_tag_pose[0][2]:.2f}"
+                cv2.putText(output_image, position_text, (10, 30 + idx * 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # 添加FPS显示
-        cv2.putText(output_image, f"FPS: {fps:.1f}", (10, 60),
+        cv2.putText(output_image, f"FPS: {fps:.1f}", (10, output_image.shape[0] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # 添加系统状态信息
+        status_text = "系统状态: " + ("已初始化" if self.initialized else "未初始化")
+        cv2.putText(output_image, status_text, (output_image.shape[1] - 300, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # 保存图像

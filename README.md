@@ -211,69 +211,74 @@ python apriltag_detector.py [配置文件路径] --camera 相机ID --width 宽�
 
 ## 配置文件说明
 
-### AprilTag配置文件 (JSON)
-
-位于 `config/vision/tags_36h11_all.json`，包含以下主要配置:
+系统的所有配置都可以在 `config/vision/table_setup.json` 文件中进行设置：
 
 ```json
 {
     "AprilTagConfig": {
         "family": "tag36h11",      // 标签家族
-        "size": 0.1,               // 标签尺寸(米)
-        "threads": 2,              // 线程数
-        // 其他检测参数...
+        "size": 0.05,              // 标签物理尺寸（单位：米）
+        "threads": 2,              // 处理线程数
+        "max_hamming": 0,          // 最大汉明距离
+        "z_up": true,              // Z轴朝上
+        "decimate": 1.0,           // 图像下采样系数
+        "blur": 0.8,               // 模糊系数
+        "refine_edges": 1,         // 是否精细化边缘
+        "debug": 0                 // 是否打开调试
+    },
+
+    "Camera": {
+        "device_id": 0,            // 相机设备ID
+        "width": 1280,             // 相机宽度分辨率
+        "height": 720,             // 相机高度分辨率
+        "camera_info_path": "config/camera/camera_info_1.yaml"  // 相机标定参数文件
     },
 
     "Archive": {
-        "enable": true,            // 是否启用存档
-        "preview": true,           // 是否实时预览
-        "path": "./data/apriltag"  // 存档路径
-        // 其他存档参数...
+        "enable": true,            // 是否启用数据存档
+        "preview": true,           // 是否显示预览窗口
+        "save_raw": false,         // 是否保存原始图像
+        "save_pred": false,        // 是否保存预测图像
+        "path": "./data/table_tracking"  // 数据保存路径
+    },
+
+    "TableConfig": {
+        "reference_tags": [0, 1, 2, 3],      // 参考标签ID列表
+        "moving_tags": [4, 5, 6],            // 移动标签ID列表
+        "require_initialization": true,       // 是否需要初始化
+        "tag_positions": {                    // 预设标签位置（如果有）
+            "0": [0.0, 0.0, 0.0],
+            "1": [0.5, 0.0, 0.0],
+            "2": [0.5, 0.5, 0.0],
+            "3": [0.0, 0.5, 0.0]
+        }
     }
 }
 ```
-✅ AprilTagConfig 部分：这是关于 AprilTag 检测器本身的配置。
 
-参数	含义
-family: "tag36h11"	使用的 AprilTag 标签家族，tag36h11 是一种常见的、高精度标签家族。
-size: 0.1	标签在现实世界中的实际边长（单位：米），通常用于从图像中恢复真实的三维位置。
-threads: 2	用于并行处理的线程数量，加快检测速度。
-max_hamming: 0	最大汉明距离，表示识别时容忍的标签编码误差数，0 表示只接受完全匹配的标签。
-z_up: true	坐标系的方向设置，若为 true，表示 Z 轴朝上（适用于某些 SLAM 系统）。
-图像预处理参数：
+通过修改配置文件，可以：
+1. 配置AprilTag检测器参数
+2. 设置相机参数（设备ID、分辨率、参数文件）
+3. 配置数据存档选项
+4. 自定义参考标签和移动标签的ID
+5. 控制是否需要初始化（设置 `require_initialization` 为 `false` 可跳过初始化步骤）
+6. 预设标签的位置信息
 
-参数	含义
-decimate: 1.0	图像降采样系数，1.0 表示不降采样；设置小于1可以加速但降低精度。
-blur: 1.0	应用高斯模糊的程度，用于减少噪声。
-refine_edges: 1	是否优化检测边缘，1 表示开启，提升精度但增加计算量。
-debug: 0	是否开启调试信息，0 表示关闭调试输出。
-📁 Archive 部分：控制检测结果的保存与预览。
+### 使用方法
 
-参数	含义
-enable: true	是否开启归档功能（保存图像和检测结果）。
-preview: true	检测后是否显示检测结果的图像预览窗口。
-preview_delay: 3000	预览图像显示的时间（毫秒），这里是 3 秒。
-save_raw: false	是否保存原始输入图像，false 表示不保存。
-save_pred: true	是否保存包含检测结果的图像（带标签边框和ID）。
-path: "./data/apriltag"	保存图像和数据的路径。
+非常简单，只需要一个命令即可启动系统：
 
-### 相机参数文件 (YAML)
-
-位于 `config/camera/camera_info_1.yaml`，包含相机内参和畸变系数：
-
-```yaml
-image_width: 1280
-image_height: 720
-camera_matrix:
-  rows: 3
-  cols: 3
-  data: [fx, 0, cx, 0, fy, cy, 0, 0, 1]
-distortion_coefficients:
-  rows: 1
-  cols: 5
-  data: [k1, k2, p1, p2, k3]
-# 其他参数...
 ```
+python table_tracking.py
+```
+
+如果需要使用自定义配置文件：
+
+```
+python table_tracking.py --config 自定义配置文件路径
+```
+
+系统运行后，可以按 'i' 键随时手动触发初始化过程。
 
 ## 常见问题
 
@@ -324,3 +329,64 @@ apriltag_standalone/
 ## 许可证
 
 本项目基于MIT许可证 
+
+## 新功能说明
+
+### 多标签跟踪和遮挡处理
+
+本系统现在支持以下新功能：
+
+1. **拍照初始化**：系统启动后，会自动进行一次拍照初始化，记录标签的位置关系，包括：
+   - 固定参考标签（ID 0-3）的位置
+   - 多个移动标签（默认 ID 4,5,6）之间的相对位置关系
+
+2. **遮挡处理**：初始化后，即使某些标签被遮挡：
+   - 若参考标签被遮挡，系统可使用其他可见参考标签估计被遮挡标签的位置
+   - 若移动标签被遮挡，系统可通过其他可见的移动标签估计被遮挡移动标签的位置
+
+3. **多标签跟踪**：支持同时跟踪多个移动标签，默认支持 ID 4,5,6
+   - 移动标签之间的相对位置如果固定，则只要有一个可见，就能估计其他标签位置
+   - 可以在配置文件中自定义移动标签 ID
+
+### 配置文件说明
+
+系统的所有配置都可以在 `config/vision/table_setup.json` 文件中进行设置：
+
+```json
+{
+    "TableConfig": {
+        "reference_tags": [0, 1, 2, 3],      // 参考标签ID列表
+        "moving_tags": [4, 5, 6],            // 移动标签ID列表
+        "require_initialization": true,       // 是否需要初始化
+        "tag_positions": {                    // 预设标签位置（如果有）
+            "0": [0.0, 0.0, 0.0],
+            "1": [0.5, 0.0, 0.0],
+            "2": [0.5, 0.5, 0.0],
+            "3": [0.0, 0.5, 0.0]
+        }
+    }
+}
+```
+
+通过修改配置文件，可以：
+1. 自定义参考标签和移动标签的ID
+2. 控制是否需要初始化（设置 `require_initialization` 为 `false` 可跳过初始化步骤）
+3. 预设标签的位置信息
+
+### 使用方法
+
+1. 使用默认配置启动系统：
+   ```
+   python table_tracking.py
+   ```
+
+2. 使用自定义配置文件启动系统：
+   ```
+   python table_tracking.py --config 自定义配置文件路径
+   ```
+
+3. 手动初始化：系统运行过程中按 'i' 键
+
+### 运行要求
+
+确保所有标签在初始化时可见，系统会记录标签之间的相对位置关系。初始化后，即使部分标签被遮挡，系统也能正确估计所有标签的位置。 

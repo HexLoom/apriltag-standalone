@@ -34,6 +34,13 @@ class AprilTagConfig:
         self.refine_edges = refine_edges
         self.debug = debug
 
+class CameraConfig:
+    def __init__(self, device_id=0, width=1280, height=720, camera_info_path="config/camera/camera_info_1.yaml"):
+        self.device_id = device_id           # 相机设备ID
+        self.width = width                   # 相机宽度
+        self.height = height                 # 相机高度
+        self.camera_info_path = camera_info_path  # 相机参数文件路径
+
 class ArchiveConfig:
     def __init__(self, enable, preview, save_raw, save_pred, preview_delay, path):
         self.enable = enable
@@ -45,29 +52,65 @@ class ArchiveConfig:
 
 class TableConfig:
     """桌面配置"""
-    def __init__(self, reference_tags, moving_tag, tag_positions):
+    def __init__(self, reference_tags, moving_tag=None, moving_tags=None, tag_positions=None, require_initialization=True):
         self.reference_tags = reference_tags  # 参考标签ID列表
-        self.moving_tag = moving_tag          # 移动标签ID
-        self.tag_positions = {}               # 参考标签预设位置
+        
+        # 兼容旧配置（单个移动标签）和新配置（多个移动标签）
+        if moving_tags is not None:
+            self.moving_tags = moving_tags  # 多个移动标签ID列表
+        elif moving_tag is not None:
+            self.moving_tags = [moving_tag]  # 转换单个移动标签为列表
+            self.moving_tag = moving_tag     # 保留向后兼容性
+        else:
+            self.moving_tags = []
+            self.moving_tag = None
+            
+        # 参考标签预设位置
+        self.tag_positions = {}
+        
         # 将字符串键转为整数
-        for tag_id, position in tag_positions.items():
-            self.tag_positions[int(tag_id)] = position
+        if tag_positions:
+            for tag_id, position in tag_positions.items():
+                self.tag_positions[int(tag_id)] = position
+                
+        # 初始化状态
+        self.initialized = False
+        
+        # 是否需要执行标签初始化
+        self.require_initialization = require_initialization
 
-def load_config(config_path, camera_info_path):
-    """加载配置文件和相机参数"""
+def load_config(config_path):
+    """加载配置文件和相机参数
+    
+    Args:
+        config_path: 配置文件路径
+        
+    Returns:
+        tuple: (apriltag_config, camera_config, archive_config, table_config, K, D)
+    """
     try:
         print(f"读取配置文件: {config_path}")
         config = read_json(config_path)
+        
+        # 加载AprilTag配置
         apriltag_config = AprilTagConfig(**config["AprilTagConfig"])
+        
+        # 加载相机配置
+        camera_config = CameraConfig(**config.get("Camera", {}))
+        
+        # 加载存档配置
         archive_config = ArchiveConfig(**config["Archive"])
+        
+        # 加载桌面配置
         table_config = TableConfig(**config["TableConfig"])
         
-        print(f"读取相机参数: {camera_info_path}")
-        K, D = read_camera_info(camera_info_path)
+        # 加载相机参数
+        print(f"读取相机参数: {camera_config.camera_info_path}")
+        K, D = read_camera_info(camera_config.camera_info_path)
         print(f"相机矩阵 K:\n{K}")
         print(f"畸变系数 D: {D}")
         
-        return apriltag_config, archive_config, table_config, K, D
+        return apriltag_config, camera_config, archive_config, table_config, K, D
     except Exception as e:
         print(f"配置加载失败: {e}")
         print("使用默认设置...")
@@ -92,10 +135,19 @@ def create_default_configs():
         debug=0
     )
     
+    # 默认相机配置
+    camera_config = CameraConfig(
+        device_id=0,
+        width=1280,
+        height=720,
+        camera_info_path="config/camera/camera_info_1.yaml"
+    )
+    
     # 默认桌面配置
     table_config = TableConfig(
         reference_tags=[0, 1, 2, 3],
-        moving_tag=4,
+        moving_tags=[4, 5, 6],  # 默认支持多个移动标签
+        require_initialization=True,  # 默认需要初始化
         tag_positions={
             0: [0.0, 0.0, 0.0],
             1: [0.5, 0.0, 0.0],
@@ -114,4 +166,4 @@ def create_default_configs():
         path="./data/table_tracking"
     )
     
-    return apriltag_config, archive_config, table_config, K, D 
+    return apriltag_config, camera_config, archive_config, table_config, K, D 
