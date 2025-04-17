@@ -317,7 +317,7 @@ class TableTracker:
             if moving_tag_id in tag_poses:
                 moving_tag_pose = tag_poses[moving_tag_id]
                 # 计算并显示距离信息
-                position_text = f"移动标签 (ID:{moving_tag_id}) 位置: "
+                position_text = f"ID:{moving_tag_id}: "
                 position_text += f"X:{moving_tag_pose[0][0]:.2f} Y:{moving_tag_pose[0][1]:.2f} Z:{moving_tag_pose[0][2]:.2f}"
                 cv2.putText(output_image, position_text, (10, 30 + idx * 30), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
@@ -333,9 +333,9 @@ class TableTracker:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # 添加系统状态信息
-        status_text = "系统状态: " + ("已初始化" if self.initialized else "未初始化")
-        status_text += " | 滤波: " + ("开启" if self.use_kalman else "关闭")
-        status_text += " | 平面约束: " + ("开启" if self.apply_plane_constraint else "关闭")
+        status_text = "state: " + ("initialized" if self.initialized else "uninitialized")
+        status_text += " | filter: " + ("on" if self.use_kalman else "off")
+        status_text += " | Planar: " + ("on" if self.apply_plane_constraint else "off")
         cv2.putText(output_image, status_text, (output_image.shape[1] - 400, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         

@@ -341,15 +341,15 @@ class TableKalmanFilter:
                 if tag_id in self.reference_tags:
                     self.filters[tag_id] = TagKalmanFilter(
                         use_acceleration=False,
-                        process_noise=1e-5,
-                        measure_noise=1e-3,
+                        process_noise=1e-5, # 参考标签过程噪声 
+                        measure_noise=1e-3, # 参考标签测量噪声 增大值会更信任新测量，减少滞后
                         initial_pose=pose
                     )
                 else:
                     self.filters[tag_id] = TagKalmanFilter(
                         use_acceleration=True,
-                        process_noise=1e-4,
-                        measure_noise=1e-2,
+                        process_noise=1e-1, # 移动标签过程噪声
+                        measure_noise=1e-1, # 移动标签测量噪声
                         initial_pose=pose
                     )
             
