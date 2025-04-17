@@ -193,7 +193,7 @@ def main():
             
             # 显示结果
             if archive_config.preview:
-                cv2.imshow("AprilTag检测", output_image)
+                cv2.imshow("AprilTag", output_image)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break

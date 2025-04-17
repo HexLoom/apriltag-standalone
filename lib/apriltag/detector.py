@@ -276,15 +276,15 @@ def draw_detection_results(image, detections, K, D, tag_size=0.1, flip_z=False):
                     0.5, (0, 255, 0), 2)
                     
         # 位置信息 (取前三位小数)
-        text_color = (0, 165, 255)
+        text_color = (0, 255, 0)
         pos_x = f"X: {tvec[0,0]:.3f}m"
         pos_y = f"Y: {tvec[1,0]:.3f}m"
         pos_z = f"Z: {tvec[2,0]:.3f}m"
         
         # 欧拉角信息
-        angle_x = f"Roll: {euler[0]:.1f}°"
-        angle_y = f"Pitch: {euler[1]:.1f}°"
-        angle_z = f"Yaw: {euler[2]:.1f}°"
+        angle_x = f"Roll: {euler[0]:.1f}"
+        angle_y = f"Pitch: {euler[1]:.1f}"
+        angle_z = f"Yaw: {euler[2]:.1f}"
         
         # 根据图像宽度调整文本位置
         text_offset = 15
@@ -321,9 +321,9 @@ def draw_detection_results(image, detections, K, D, tag_size=0.1, flip_z=False):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, angle_color, 1)
         
     # 在右下角添加检测数量信息
-    detection_info = f"检测到 {len(detections)} 个AprilTag"
+    detection_info = f"AprilTag:{len(detections)} "
     cv2.putText(output, detection_info, 
-                (output.shape[1] - 250, output.shape[0] - 20), 
+                (output.shape[1] - 100, output.shape[0] - 20), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
     return output 

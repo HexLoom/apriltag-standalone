@@ -1,0 +1,33 @@
+{
+    "AprilTagConfig": {
+        "family": "tag36h11",      
+        "size": 0.05,               
+        "threads": 2,
+        "max_hamming": 0,          
+        "z_up": true,              
+        "decimate": 1.0,           
+        "blur": 0.8,               
+        "refine_edges": 1,         
+        "debug": 0                 
+    },
+
+    "Archive": {
+        "enable": true,
+        "preview": true,
+        "preview_delay": 1,     
+        "save_raw": false,
+        "save_pred": false,
+        "path": "./data/table_tracking"
+    },
+
+    "TableConfig": {
+        "reference_tags": [0, 1, 2, 3],
+        "moving_tag": 4,
+        "tag_positions": {
+            "0": [0.0, 0.0, 0.0],
+            "1": [0.5, 0.0, 0.0],
+            "2": [0.5, 0.5, 0.0],
+            "3": [0.0, 0.5, 0.0]
+        }
+    }
+} 
