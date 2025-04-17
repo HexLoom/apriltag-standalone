@@ -23,9 +23,9 @@ import numpy as np
 import argparse
 
 # 使用新的模块化结构导入
-from lib.apriltag import Detector, DetectorOptions, draw_detection_results
-from lib.utils.config import AprilTagConfig, ArchiveConfig, read_json, read_camera_info, matrix_to_quaternion
-from lib.utils.filesystem import create_dirs_if_not_exist
+from detector import Detector, DetectorOptions, draw_detection_results
+from config import AprilTagConfig, ArchiveConfig, read_json, read_camera_info, matrix_to_quaternion
+from filesystem import create_dirs_if_not_exist
 
 def main():
     """主程序入口"""

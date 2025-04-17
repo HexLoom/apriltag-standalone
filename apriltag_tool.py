@@ -15,7 +15,7 @@ import sys
 import subprocess
 import argparse
 
-from lib.utils.filesystem import create_dirs_if_not_exist
+from lib.filesystem import create_dirs_if_not_exist
 
 def clear_screen():
     """清空控制台屏幕"""
@@ -76,7 +76,7 @@ def chessboard_generation():
             "--output", output
         ]
         
-        run_script("create_chessboard.py", args)
+        run_script("lib/create_chessboard.py", args)
     except KeyboardInterrupt:
         print("\n操作已取消")
         input("\n按回车键返回主菜单...")
@@ -116,7 +116,7 @@ def camera_calibration():
         if preview:
             args.append("--preview")
         
-        run_script("camera_calibration.py", args)
+        run_script("lib/camera_calibration.py", args)
     except KeyboardInterrupt:
         print("\n操作已取消")
         input("\n按回车键返回主菜单...")
@@ -163,7 +163,7 @@ def apriltag_detection():
             "--camera_info", camera_info
         ]
         
-        run_script("apriltag_detector.py", args)
+        run_script("lib/apriltag_detector.py", args)
     except KeyboardInterrupt:
         print("\n操作已取消")
         input("\n按回车键返回主菜单...")

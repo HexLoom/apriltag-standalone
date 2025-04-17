@@ -26,8 +26,8 @@ import time
 from datetime import datetime
 
 # 使用模块化结构导入
-from lib.camera import save_camera_calibration
-from lib.utils.filesystem import create_dirs_if_not_exist
+from calibration import save_camera_calibration
+from filesystem import create_dirs_if_not_exist
 
 def main():
     # 解析命令行参数

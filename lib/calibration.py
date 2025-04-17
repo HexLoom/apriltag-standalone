@@ -9,7 +9,7 @@
 import os
 import numpy as np
 import yaml
-from lib.utils.filesystem import create_dirs_if_not_exist
+from filesystem import create_dirs_if_not_exist
 
 def save_camera_calibration(output_file, camera_matrix, dist_coefs, image_width, image_height):
     """
