@@ -158,8 +158,11 @@ def main():
                     print(f"自动采集样本 {num_samples}/{args.samples}")
                     
                     # 增加视觉反馈
-                    cv2.putText(display_frame, "样本已采集!", (actual_width//2-100, actual_height//2),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    # cv2.putText(display_frame, "Sample collected!", (actual_width//2-100, actual_height//2),
+                    #             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    cv2.imshow('相机标定', display_frame)
+                    cv2.waitKey(500)
+                    
         
         # 显示图像
         cv2.imshow('相机标定', display_frame)
