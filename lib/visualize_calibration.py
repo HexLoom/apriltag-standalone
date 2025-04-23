@@ -16,6 +16,8 @@
     --image: 可选，用于测试校正的图像文件
     --grid: 显示网格线以更好地观察校正效果
     --enhance: 增强畸变系数以更明显地观察效果
+    --keep_fov: 保持视场角，防止校正后图像缩小
+    --alpha: 视场保留比例 (0.0-2.0), 用于控制去除黑边程度 (默认: 1.0, 步长: 0.05)
 """
 
 import os
@@ -106,7 +108,7 @@ def draw_grid(img, grid_size=50):
     
     return grid_img
 
-def visualize_single_image(image_path, camera_matrix, dist_coeffs, image_size, show_grid=False, enhance=False):
+def visualize_single_image(image_path, camera_matrix, dist_coeffs, image_size, show_grid=False, enhance=False, keep_fov=False, alpha=1.0):
     """可视化单张图像的校正效果"""
     try:
         img = cv2.imread(image_path)
@@ -134,8 +136,23 @@ def visualize_single_image(image_path, camera_matrix, dist_coeffs, image_size, s
         if show_grid:
             img = draw_grid(img)
             
-        # 校正图像
-        undistorted = cv2.undistort(img, camera_matrix, enhanced_dist)
+        # 根据是否保持视场角选择相应的相机矩阵
+        if keep_fov:
+            # 优化相机矩阵以保持视场角
+            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                camera_matrix, enhanced_dist, (image_size[0], image_size[1]), alpha)
+            
+            # 校正图像
+            undistorted = cv2.undistort(img, camera_matrix, enhanced_dist, None, new_camera_matrix)
+            
+            # 裁剪图像（可选）
+            if alpha < 1.0:
+                x, y, w, h = roi
+                undistorted = undistorted[y:y+h, x:x+w]
+                undistorted = cv2.resize(undistorted, (image_size[0], image_size[1]))
+        else:
+            # 使用原始相机矩阵进行校正
+            undistorted = cv2.undistort(img, camera_matrix, enhanced_dist)
         
         # 生成差异图像
         diff = cv2.absdiff(img, undistorted)
@@ -144,7 +161,7 @@ def visualize_single_image(image_path, camera_matrix, dist_coeffs, image_size, s
         # 创建带标签的图像
         cv2.putText(img, "原始图像", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.putText(undistorted, "校正图像", (10, 30), 
+        cv2.putText(undistorted, f"校正图像{' (保持视场)' if keep_fov else ''}", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(diff, "差异图像 (x5)", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
@@ -163,7 +180,7 @@ def visualize_single_image(image_path, camera_matrix, dist_coeffs, image_size, s
     except Exception as e:
         print(f"处理图像错误: {e}")
 
-def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_grid=False, enhance=False):
+def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_grid=False, enhance=False, keep_fov=False, alpha=1.0):
     """实时可视化相机校正效果"""
     try:
         cap = cv2.VideoCapture(camera_id)
@@ -194,15 +211,50 @@ def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_gri
                 enhanced_dist[0, 4] *= scaling_factor
         else:
             enhanced_dist = dist_coeffs
+        
+        # 计算适应所有alpha值的最大黑边ROI（alpha=0时）
+        temp_matrix, full_roi = cv2.getOptimalNewCameraMatrix(
+            camera_matrix, enhanced_dist, (image_size[0], image_size[1]), 0)
+        
+        # 保存原始ROI信息
+        full_roi_x, full_roi_y, full_roi_w, full_roi_h = full_roi
+        
+        # 生成重映射表（根据是否保持视场角）
+        if keep_fov:
+            # 使用getOptimalNewCameraMatrix优化相机矩阵
+            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                camera_matrix, enhanced_dist, (image_size[0], image_size[1]), alpha)
             
-        # 生成重映射表
-        map1, map2 = cv2.initUndistortRectifyMap(
-            camera_matrix, enhanced_dist, None, camera_matrix,
-            (image_size[0], image_size[1]), cv2.CV_32FC1)
+            # 生成重映射表
+            map1, map2 = cv2.initUndistortRectifyMap(
+                camera_matrix, enhanced_dist, None, new_camera_matrix,
+                (image_size[0], image_size[1]), cv2.CV_32FC1)
             
-        print("按 'q' 退出, 'g' 切换网格, 'e' 切换增强效果")
+            # 保存ROI以便裁剪（始终使用alpha=0时的完整ROI）
+            roi = full_roi
+            has_roi = True
+        else:
+            # 使用原始相机矩阵
+            map1, map2 = cv2.initUndistortRectifyMap(
+                camera_matrix, enhanced_dist, None, camera_matrix,
+                (image_size[0], image_size[1]), cv2.CV_32FC1)
+            has_roi = False
+            
+        # alpha值调整步长
+        alpha_step = 0.05  # 更小的步长
+        # alpha值范围扩大
+        alpha_min = 0.0  # 允许从0开始
+        alpha_max = 2.0  # 允许超过1以提供更广的调整范围
+        
+        # 实时显示的缩放比例
+        zoom_factor = 1.0
+        
+        print("按 'q' 退出, 'g' 切换网格, 'e' 切换增强效果, 'f' 切换视场保持")
+        print("a/d: 减小/增加alpha值, z/x: 减小/增加缩放比例")
         show_grid_current = show_grid
         show_enhanced = enhance
+        keep_fov_current = keep_fov
+        alpha_current = alpha
         
         while True:
             ret, frame = cap.read()
@@ -219,6 +271,65 @@ def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_gri
             # 校正图像
             undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
             
+            # 如果启用ROI裁剪，实现平滑渐变的裁剪过程
+            if keep_fov_current and has_roi:
+                # 获取完整ROI信息
+                x, y, w, h = full_roi
+                
+                if alpha_current < 1.0 and w > 0 and h > 0:
+                    # 根据alpha计算裁剪比例（alpha=1时不裁剪，alpha=0时完全裁剪）
+                    crop_ratio = 1.0 - alpha_current
+                    
+                    # 计算新的裁剪区域（从全尺寸向ROI过渡）
+                    # 图像宽度从image_size[0]向w过渡
+                    # 图像高度从image_size[1]向h过渡
+                    new_w = int(image_size[0] - (image_size[0] - w) * crop_ratio)
+                    new_h = int(image_size[1] - (image_size[1] - h) * crop_ratio)
+                    
+                    # 计算新的起始位置（从0,0向x,y过渡）
+                    new_x = int(x * crop_ratio)
+                    new_y = int(y * crop_ratio)
+                    
+                    # 裁剪并缩放
+                    if new_w > 0 and new_h > 0 and new_x + new_w <= image_size[0] and new_y + new_h <= image_size[1]:
+                        undistorted = undistorted[new_y:new_y+new_h, new_x:new_x+new_w]
+                        undistorted = cv2.resize(undistorted, (image_size[0], image_size[1]))
+            
+            # 应用缩放 (用于在不改变相机矩阵的情况下调整视场大小)
+            if zoom_factor != 1.0:
+                h, w = undistorted.shape[:2]
+                # 计算缩放尺寸
+                new_h, new_w = int(h * zoom_factor), int(w * zoom_factor)
+                # 计算裁剪的起始点
+                start_y = max(0, (h - new_h) // 2)
+                start_x = max(0, (w - new_w) // 2)
+                
+                if zoom_factor < 1.0:  # 缩小 (显示更多区域)
+                    # 创建更大的画布
+                    canvas = np.zeros((h, w, 3), dtype=undistorted.dtype)
+                    # 计算小图像的位置
+                    pos_y = (h - new_h) // 2
+                    pos_x = (w - new_w) // 2
+                    # 缩放图像
+                    small_img = cv2.resize(undistorted, (new_w, new_h))
+                    # 放到画布中心
+                    canvas[pos_y:pos_y+new_h, pos_x:pos_x+new_w] = small_img
+                    undistorted = canvas
+                else:  # 放大 (只显示中心区域)
+                    # 确保不超出图像边界
+                    if new_h < h and new_w < w:
+                        # 裁剪中心区域
+                        center_y, center_x = h // 2, w // 2
+                        half_new_h, half_new_w = new_h // 2, new_w // 2
+                        # 裁剪区域
+                        crop_y1 = max(0, center_y - half_new_h)
+                        crop_y2 = min(h, center_y + half_new_h)
+                        crop_x1 = max(0, center_x - half_new_w)
+                        crop_x2 = min(w, center_x + half_new_w)
+                        # 裁剪并缩放回原始大小
+                        cropped = undistorted[crop_y1:crop_y2, crop_x1:crop_x2]
+                        undistorted = cv2.resize(cropped, (w, h))
+            
             # 生成差异图像
             diff = cv2.absdiff(frame, undistorted)
             diff = cv2.convertScaleAbs(diff, alpha=5.0)
@@ -227,18 +338,23 @@ def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_gri
             cv2.putText(frame, "原始图像", (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             cv2.putText(undistorted, 
-                       f"校正图像 {'(增强)' if show_enhanced else ''}", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                       f"校正图像 {'(增强)' if show_enhanced else ''} {'(保持视场)' if keep_fov_current else ''}", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             cv2.putText(diff, "差异图像 (x5)", (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                        
             # 创建信息面板
             info_panel = np.zeros((100, image_size[0]*2, 3), dtype=np.uint8)
-            cv2.putText(info_panel, "q: 退出  g: 网格  e: 增强效果", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(info_panel, "q: 退出  g: 网格  e: 增强  f: 保持视场  a/d: alpha值  z/x: 缩放", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             cv2.putText(info_panel, 
-                       f"网格: {'开启' if show_grid_current else '关闭'}  增强: {'开启' if show_enhanced else '关闭'}", 
-                       (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                       f"网格: {'开启' if show_grid_current else '关闭'}  " +
+                       f"增强: {'开启' if show_enhanced else '关闭'}  " +
+                       f"保持视场: {'开启' if keep_fov_current else '关闭'}", 
+                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(info_panel, 
+                       f"alpha: {alpha_current:.2f}  缩放: {zoom_factor:.2f}x",
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
             # 组合显示
             top_row = np.hstack((frame, undistorted))
@@ -256,7 +372,35 @@ def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_gri
             elif key == ord('e'):
                 show_enhanced = not show_enhanced
                 print(f"增强效果: {'开启' if show_enhanced else '关闭'}")
-                # 重新计算映射
+                update_mapping = True
+            elif key == ord('f'):
+                keep_fov_current = not keep_fov_current
+                print(f"保持视场: {'开启' if keep_fov_current else '关闭'}")
+                update_mapping = True
+            elif key == ord('a'):
+                # 减小alpha值 (更多裁剪)
+                alpha_current = max(alpha_min, alpha_current - alpha_step)
+                print(f"视场比例 alpha: {alpha_current:.2f}")
+                update_mapping = True
+            elif key == ord('d'):
+                # 增加alpha值 (更少裁剪)
+                alpha_current = min(alpha_max, alpha_current + alpha_step)
+                print(f"视场比例 alpha: {alpha_current:.2f}")
+                update_mapping = True
+            elif key == ord('z'):
+                # 减小缩放比例 (查看更广视场)
+                zoom_factor = max(0.5, zoom_factor - 0.05)
+                print(f"缩放比例: {zoom_factor:.2f}x")
+            elif key == ord('x'):
+                # 增加缩放比例 (放大查看细节)
+                zoom_factor = min(2.0, zoom_factor + 0.05)
+                print(f"缩放比例: {zoom_factor:.2f}x")
+            else:
+                continue  # 如果没有按键需要处理，跳过重新计算映射
+                
+            # 处理需要更新映射的按键
+            if key in [ord('e'), ord('f'), ord('a'), ord('d')]:
+                # 准备畸变系数
                 if show_enhanced:
                     enhanced_dist = dist_coeffs.copy()
                     scaling_factor = 1.5
@@ -269,10 +413,26 @@ def visualize_camera(camera_id, camera_matrix, dist_coeffs, image_size, show_gri
                 else:
                     enhanced_dist = dist_coeffs
                 
-                # 更新映射
-                map1, map2 = cv2.initUndistortRectifyMap(
-                    camera_matrix, enhanced_dist, None, camera_matrix,
-                    (image_size[0], image_size[1]), cv2.CV_32FC1)
+                # 根据是否保持视场角更新映射
+                if keep_fov_current:
+                    # 使用getOptimalNewCameraMatrix优化相机矩阵
+                    new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                        camera_matrix, enhanced_dist, (image_size[0], image_size[1]), alpha_current)
+                    
+                    # 更新重映射表
+                    map1, map2 = cv2.initUndistortRectifyMap(
+                        camera_matrix, enhanced_dist, None, new_camera_matrix,
+                        (image_size[0], image_size[1]), cv2.CV_32FC1)
+                    
+                    # 使用完整ROI以便平滑过渡
+                    roi = full_roi
+                    has_roi = True
+                else:
+                    # 使用原始相机矩阵更新映射
+                    map1, map2 = cv2.initUndistortRectifyMap(
+                        camera_matrix, enhanced_dist, None, camera_matrix,
+                        (image_size[0], image_size[1]), cv2.CV_32FC1)
+                    has_roi = False
         
         cap.release()
         cv2.destroyAllWindows()
@@ -295,16 +455,30 @@ def main():
                         help='显示网格线以更好地观察校正效果')
     parser.add_argument('--enhance', action='store_true',
                         help='增强畸变系数以更明显地观察效果')
+    parser.add_argument('--keep_fov', action='store_true',
+                        help='保持视场角，防止校正后图像缩小')
+    parser.add_argument('--alpha', type=float, default=1.0,
+                        help='视场保留比例 (0.0-2.0), 用于控制去除黑边程度 (默认: 1.0, 步长: 0.05)')
     args = parser.parse_args()
+    
+    # 更新alpha值限制范围
+    if args.alpha < 0.0:
+        print(f"警告: alpha值 {args.alpha} 太小，已调整为最小值 0.0")
+        args.alpha = 0.0
+    elif args.alpha > 2.0:
+        print(f"警告: alpha值 {args.alpha} 太大，已调整为最大值 2.0")
+        args.alpha = 2.0
     
     # 加载相机标定文件
     camera_matrix, dist_coeffs, image_size = load_camera_calibration(args.calibration)
     
     # 根据输入选择可视化模式
     if args.image:
-        visualize_single_image(args.image, camera_matrix, dist_coeffs, image_size, args.grid, args.enhance)
+        visualize_single_image(args.image, camera_matrix, dist_coeffs, image_size, 
+                              args.grid, args.enhance, args.keep_fov, args.alpha)
     else:
-        visualize_camera(args.camera, camera_matrix, dist_coeffs, image_size, args.grid, args.enhance)
+        visualize_camera(args.camera, camera_matrix, dist_coeffs, image_size, 
+                        args.grid, args.enhance, args.keep_fov, args.alpha)
 
 if __name__ == "__main__":
     main() 
