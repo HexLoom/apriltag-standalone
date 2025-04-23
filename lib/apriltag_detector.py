@@ -35,8 +35,8 @@ def main():
                         help='配置文件路径(默认: config/vision/tags_36h11_all.json)')
     parser.add_argument('--camera', type=int, default=0,
                         help='相机设备ID(默认: 0)')
-    parser.add_argument('--camera_info', default='config/camera/camera_info_1.yaml',
-                        help='相机参数文件路径(默认: config/camera/camera_info_1.yaml)')
+    parser.add_argument('--camera_info', default='config/camera/HSK_200W53_1080P.yaml',
+                        help='相机参数文件路径(默认: config/camera/HSK_200W53_1080P.yaml)')
     parser.add_argument('--width', type=int, default=1280,
                         help='相机宽度(默认: 1280)')
     parser.add_argument('--height', type=int, default=720,

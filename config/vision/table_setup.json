@@ -13,9 +13,9 @@
 
     "Camera": {
         "device_id": 0,
-        "width": 1280,
-        "height": 720,
-        "camera_info_path": "config/camera/camera_info_1.yaml"
+        "width": 1920,
+        "height": 1080,
+        "camera_info_path": "config/camera/HSK_200W53_1080P.yaml"
     },
 
     "Archive": {

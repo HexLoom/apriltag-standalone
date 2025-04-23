@@ -149,6 +149,48 @@ def main():
                     # 如果差异太小，忽略这个样本
                     if mean_dist < 10.0:  # 像素距离阈值
                         save_sample = False
+                        print(f"样本位置差异太小 ({mean_dist:.2f} 像素)，忽略")
+                    else:
+                        print(f"样本差异度: {mean_dist:.2f} 像素")
+                
+                    # 简单的姿态估计，检查样本角度分布
+                    if len(objpoints) >= 3:
+                        # 使用solvePnP估计相机姿态
+                        # 创建一个临时相机矩阵用于姿态估计
+                        temp_camera_matrix = np.array([
+                            [actual_width, 0, actual_width/2],
+                            [0, actual_width, actual_height/2],
+                            [0, 0, 1]
+                        ], dtype=np.float32)
+                        
+                        _, rvec, tvec = cv2.solvePnP(
+                            objp, corners2, cameraMatrix=temp_camera_matrix, distCoeffs=None, 
+                            flags=cv2.SOLVEPNP_ITERATIVE)
+                        
+                        # 将旋转向量转换为欧拉角
+                        R, _ = cv2.Rodrigues(rvec)
+                        euler_angles = np.degrees(cv2.RQDecomp3x3(R)[0])
+                        
+                        # 检查与已有样本的角度差异
+                        angle_too_similar = False
+                        for i in range(len(objpoints)):
+                            # 为已有样本计算姿态
+                            _, r, _ = cv2.solvePnP(
+                                objp, imgpoints[i], cameraMatrix=temp_camera_matrix, distCoeffs=None, 
+                                flags=cv2.SOLVEPNP_ITERATIVE)
+                            R_prev, _ = cv2.Rodrigues(r)
+                            euler_prev = np.degrees(cv2.RQDecomp3x3(R_prev)[0])
+                            
+                            # 计算角度差异
+                            angle_diff = np.linalg.norm(euler_angles - euler_prev)
+                            if angle_diff < 15.0:  # 角度阈值（度）
+                                angle_too_similar = True
+                                print(f"与样本 {i+1} 角度太相似 ({angle_diff:.2f}°)，建议从不同角度拍摄")
+                                break
+                        
+                        # 如果角度差异太小，给出警告但仍然保存
+                        if angle_too_similar:
+                            print("警告: 建议从更多不同角度拍摄棋盘格以提高标定质量")
                 
                 if save_sample:
                     objpoints.append(objp)
@@ -221,8 +263,105 @@ def main():
     print(f"相机内参矩阵:\n{camera_matrix}")
     print(f"畸变系数: {dist_coefs.ravel()}")
     
+    # 计算每个棋盘格的重投影误差
+    mean_errors = []
+    max_errors = []
+    error_imgs = []
+    
+    print("\n计算各样本的重投影误差...")
+    for i in range(len(objpoints)):
+        # 计算投影点
+        imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], camera_matrix, dist_coefs)
+        
+        # 计算误差
+        error = cv2.norm(imgpoints[i], imgpoints2, cv2.NORM_L2) / len(imgpoints2)
+        mean_errors.append(error)
+        
+        # 计算每个点的误差
+        point_errors = []
+        for j in range(len(imgpoints[i])):
+            pt1 = tuple(imgpoints[i][j][0])
+            pt2 = tuple(imgpoints2[j][0])
+            err = np.sqrt((pt1[0] - pt2[0])**2 + (pt1[1] - pt2[1])**2)
+            point_errors.append(err)
+        
+        max_errors.append(max(point_errors))
+        
+        print(f"样本 {i+1}: 平均误差 = {error:.6f} 像素, 最大误差 = {max(point_errors):.6f} 像素")
+        
+        # 创建误差可视化图像(可选，仅在debug模式下)
+        if len(mean_errors) <= 5:  # 只保存前5个图像以节省空间
+            # 获取原始图像尺寸，创建空白图像
+            img = np.zeros((actual_height, actual_width, 3), dtype=np.uint8)
+            
+            # 绘制原始角点(红色)和重投影角点(绿色)
+            for j in range(len(imgpoints[i])):
+                pt1 = tuple(map(int, imgpoints[i][j][0]))
+                pt2 = tuple(map(int, imgpoints2[j][0]))
+                
+                # 原始检测点(红色)
+                cv2.circle(img, pt1, 5, (0, 0, 255), -1)
+                
+                # 重投影点(绿色)
+                cv2.circle(img, pt2, 3, (0, 255, 0), -1)
+                
+                # 连线(蓝色)
+                cv2.line(img, pt1, pt2, (255, 0, 0), 1)
+                
+                # 标记点编号
+                cv2.putText(img, str(j), pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                
+                # 标记误差值
+                err_text = f"{point_errors[j]:.2f}"
+                cv2.putText(img, err_text, (pt2[0]+5, pt2[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+            
+            # 添加样本信息
+            cv2.putText(img, f"样本 {i+1}, 平均误差: {error:.2f}px", (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            error_imgs.append(img)
+    
+    # 计算重投影误差统计
+    mean_error = np.mean(mean_errors)
+    max_mean_error = np.max(mean_errors)
+    max_error = np.max(max_errors)
+    std_error = np.std(mean_errors)
+    
+    print(f"\n重投影误差统计:")
+    print(f"  平均误差: {mean_error:.6f} 像素")
+    print(f"  最大平均误差: {max_mean_error:.6f} 像素 (样本 {np.argmax(mean_errors)+1})")
+    print(f"  最大误差: {max_error:.6f} 像素")
+    print(f"  误差标准差: {std_error:.6f} 像素")
+    
+    # 保存重投影误差图像
+    if error_imgs:
+        print("\n保存重投影误差可视化...")
+        output_dir = os.path.join(os.path.dirname(args.output), "error_visualization")
+        create_dirs_if_not_exist(output_dir)
+        
+        for i, img in enumerate(error_imgs):
+            output_path = os.path.join(output_dir, f"reproj_error_sample_{i+1}.png")
+            cv2.imwrite(output_path, img)
+        
+        print(f"已保存重投影误差可视化图像到 {output_dir}")
+        
+    # 保存重投影误差信息
+    error_data = {
+        'mean_reprojection_error': float(ret),
+        'sample_errors': {
+            'mean_errors': [float(e) for e in mean_errors],
+            'max_errors': [float(e) for e in max_errors]
+        },
+        'error_statistics': {
+            'mean': float(mean_error),
+            'max_mean': float(max_mean_error),
+            'max': float(max_error),
+            'std': float(std_error)
+        }
+    }
+    
     # 保存标定结果
-    save_camera_calibration(args.output, camera_matrix, dist_coefs, actual_width, actual_height)
+    calibration_data = save_camera_calibration(args.output, camera_matrix, dist_coefs, actual_width, actual_height, error_data)
     
     # 如果需要预览校正效果
     if args.preview and num_samples > 0:
@@ -247,33 +386,123 @@ def main():
             camera_matrix, dist_coefs, None, camera_matrix, 
             (actual_width, actual_height), cv2.CV_32FC1)
         
-        print("按'q'退出预览")
+        # 放大畸变系数以增强效果（仅用于可视化）
+        enhanced_dist_coefs = dist_coefs.copy()
+        # 放大径向畸变系数（k1, k2, k3）
+        scaling_factor = 1.5  # 可调整此值以增强效果
+        # 仅当畸变不为零时应用缩放
+        if np.abs(enhanced_dist_coefs[0, 0]) > 1e-5:
+            enhanced_dist_coefs[0, 0] *= scaling_factor  # k1
+        if np.abs(enhanced_dist_coefs[0, 1]) > 1e-5:
+            enhanced_dist_coefs[0, 1] *= scaling_factor  # k2
+        if len(enhanced_dist_coefs[0]) > 4 and np.abs(enhanced_dist_coefs[0, 4]) > 1e-5:
+            enhanced_dist_coefs[0, 4] *= scaling_factor  # k3
+        
+        # 增强效果的校正映射
+        enhanced_map1, enhanced_map2 = cv2.initUndistortRectifyMap(
+            camera_matrix, enhanced_dist_coefs, None, camera_matrix, 
+            (actual_width, actual_height), cv2.CV_32FC1)
+            
+        # 绘制参考线以便更容易观察校正效果
+        def draw_grid(img, grid_size=50):
+            h, w = img.shape[:2]
+            grid_img = img.copy()
+            
+            # 绘制水平线
+            for y in range(0, h, grid_size):
+                cv2.line(grid_img, (0, y), (w, y), (0, 255, 255), 1)
+                
+            # 绘制垂直线
+            for x in range(0, w, grid_size):
+                cv2.line(grid_img, (x, 0), (x, h), (0, 255, 255), 1)
+                
+            # 绘制中心十字线
+            cv2.line(grid_img, (w//2, 0), (w//2, h), (0, 0, 255), 2)
+            cv2.line(grid_img, (0, h//2), (w, h//2), (0, 0, 255), 2)
+            
+            return grid_img
+        
+        print("按'q'退出预览，按'e'切换增强效果，按'g'切换网格显示")
+        
+        # 展示模式标志
+        show_enhanced = False
+        show_grid = False
         
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
                 
+            # 添加网格线（如果启用）
+            if show_grid:
+                frame = draw_grid(frame)
+            
             # 未校正的图像
-            cv2.putText(frame, "Original", (10, 30), 
+            cv2.putText(frame, "original", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             
-            # 校正后的图像
-            undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
-            cv2.putText(undistorted, "Undistorted", (10, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            # 根据选择使用正常校正或增强校正
+            if show_enhanced:
+                undistorted = cv2.remap(frame, enhanced_map1, enhanced_map2, cv2.INTER_LINEAR)
+                cv2.putText(undistorted, "correct (enhance)", (10, 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            else:
+                undistorted = cv2.remap(frame, map1, map2, cv2.INTER_LINEAR)
+                cv2.putText(undistorted, "correct ", (10, 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            # 如果启用网格，也在校正图像上添加
+            if show_grid:
+                undistorted = draw_grid(undistorted)
+            
+            # 计算差异图像以突出校正的变化
+            diff = cv2.absdiff(frame, undistorted)
+            # 增强差异使其更明显
+            diff = cv2.convertScaleAbs(diff, alpha=5.0)
+            cv2.putText(diff, "差异图像 (x5)", (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            
+            # 创建一个信息面板
+            info_panel = np.zeros((100, actual_width*2, 3), dtype=np.uint8)
+            cv2.putText(info_panel, "q: quit  e: enhance  g: grid", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(info_panel, f"增强效果: {'开启' if show_enhanced else '关闭'}  网格: {'开启' if show_grid else '关闭'}", 
+                       (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             # 并排显示
-            combined = np.hstack((frame, undistorted))
+            top_row = np.hstack((frame, undistorted))
+            bottom_row = np.hstack((diff, np.zeros_like(diff)))  # 右下方留空
+            
+            # 组合所有图像
+            combined = np.vstack((top_row, bottom_row, info_panel))
             cv2.imshow('校正效果对比', combined)
             
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 break
+            elif key == ord('e'):
+                show_enhanced = not show_enhanced
+                print(f"增强效果: {'开启' if show_enhanced else '关闭'}")
+            elif key == ord('g'):
+                show_grid = not show_grid
+                print(f"网格显示: {'开启' if show_grid else '关闭'}")
                 
         cap.release()
         cv2.destroyAllWindows()
     
-    print("相机标定完成")
+    print("\n标定过程完成!")
+    print(f"标定结果已保存至: {args.output}")
+    print("\n您可以使用以下工具检查和可视化标定结果:")
+    print(f"1. 检查标定质量: python lib/check_calibration.py --calibration {args.output}")
+    print(f"2. 可视化标定效果: python lib/visualize_calibration.py --calibration {args.output} [--enhance] [--grid]")
+    print("   - 添加 --enhance 参数可增强视觉效果")
+    print("   - 添加 --grid 参数可显示网格线")
+    print("   - 添加 --image <图像路径> 可对静态图像进行校正")
+    print("\n如果校正效果不明显，可能的原因包括:")
+    print("- 相机畸变本身很小")
+    print("- 标定样本不够多或分布不均匀")
+    print("- 标定时的方格大小参数和实际不符")
+    print("- 棋盘格未能覆盖图像边缘区域(畸变通常在边缘更显著)")
     
 if __name__ == "__main__":
     main() 

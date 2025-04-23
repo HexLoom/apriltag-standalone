@@ -38,13 +38,13 @@ python table_tracking.py
 带参数的用法：
 
 ```bash
-python table_tracking.py --camera 0 --config config/vision/table_setup.json --camera_info config/camera/camera_info_1.yaml --width 1280 --height 720
+python table_tracking.py --camera 0 --config config/vision/table_setup.json --camera_info config/camera/HSK_200W53_1080P.yaml --width 1280 --height 720
 ```
 
 参数说明：
 - `--camera`: 相机设备ID (默认: 0)
 - `--config`: 配置文件路径 (默认: config/vision/table_setup.json)
-- `--camera_info`: 相机参数文件 (默认: config/camera/camera_info_1.yaml)
+- `--camera_info`: 相机参数文件 (默认: config/camera/HSK_200W53_1080P.yaml)
 - `--width`: 相机宽度分辨率 (默认: 1280)
 - `--height`: 相机高度分辨率 (默认: 720)
 

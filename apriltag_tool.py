@@ -96,8 +96,8 @@ def camera_calibration():
         size = input("输入棋盘格内角点数量 (宽x高, 默认 9x6): ") or "9x6"
         square = input("输入实际方格大小 (米, 默认 0.025): ") or "0.025"
         camera = input("输入相机设备ID (默认 0): ") or "0"
-        width = input("输入相机宽度 (默认 1280): ") or "1280"
-        height = input("输入相机高度 (默认 720): ") or "720"
+        width = input("输入相机宽度 (默认 1920): ") or "1920"
+        height = input("输入相机高度 (默认 1080): ") or "1080"
         samples = input("输入标定样本数量 (默认 20): ") or "20"
         output = input("输入输出文件路径 (默认 config/camera/camera_info_1.yaml): ") or "config/camera/camera_info_1.yaml"
         preview = input("标定后是否预览效果 (y/n, 默认 y): ").lower() in ("y", "yes", "") 
@@ -149,8 +149,8 @@ def apriltag_detection():
             print("将使用配置文件中的默认值。")
         
         camera = input("输入相机设备ID (默认 0): ") or "0"
-        width = input("输入相机宽度 (默认 1280): ") or "1280"
-        height = input("输入相机高度 (默认 720): ") or "720"
+        width = input("输入相机宽度 (默认 1920): ") or "1920"
+        height = input("输入相机高度 (默认 1080): ") or "1080"
         config_path = input("输入标签配置文件路径 (默认 config/vision/tags_36h11_all.json): ") or "config/vision/tags_36h11_all.json"
         camera_info = input("输入相机标定文件路径 (默认 config/camera/camera_info_1.yaml): ") or "config/camera/camera_info_1.yaml"
         

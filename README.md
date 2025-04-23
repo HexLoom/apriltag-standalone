@@ -156,7 +156,7 @@ python apriltag_tool.py
 python create_chessboard.py --size 9x6 --square 100 --output chessboard.png --dpi 300
 
 # 打印棋盘格并测量实际方格大小，然后进行标定
-python camera_calibration.py --size 9x6 --square 0.025 --output config/camera/camera_info_1.yaml
+python camera_calibration.py --size 9x6 --square 0.025 --output config/camera/HSK_200W53_1080P.yaml
 ```
 
 参数说明:
@@ -170,7 +170,7 @@ python camera_calibration.py --size 9x6 --square 0.025 --output config/camera/ca
 **相机标定程序 (camera_calibration.py):**
 - `--size`: 棋盘格内角点数量，宽x高 (默认: 9x6)
 - `--square`: 棋盘格方块大小，单位米 (默认: 0.025)
-- `--output`: 输出文件路径 (默认: config/camera/camera_info_1.yaml)
+- `--output`: 输出文件路径 (默认: config/camera/HSK_200W53_1080P.yaml)
 - `--camera`: 摄像头设备ID (默认: 0)
 - `--width`: 摄像头捕获宽度 (默认: 1280)
 - `--height`: 摄像头捕获高度 (默认: 720)
@@ -201,7 +201,7 @@ python apriltag_detector.py [配置文件路径] --camera 相机ID --width 宽�
 参数说明:
 - `配置文件路径`: AprilTag配置文件路径 (默认: `config/vision/tags_36h11_all.json`)
 - `--camera`: 摄像头设备ID (默认: 0)
-- `--camera_info`: 相机内参文件路径 (默认: `config/camera/camera_info_1.yaml`)
+- `--camera_info`: 相机内参文件路径 (默认: `config/camera/HSK_200W53_1080P.yaml`)
 - `--width`: 摄像头捕获宽度 (默认: 1280)
 - `--height`: 摄像头捕获高度 (默认: 720)
 
@@ -231,7 +231,7 @@ python apriltag_detector.py [配置文件路径] --camera 相机ID --width 宽�
         "device_id": 0,            // 相机设备ID
         "width": 1280,             // 相机宽度分辨率
         "height": 720,             // 相机高度分辨率
-        "camera_info_path": "config/camera/camera_info_1.yaml"  // 相机标定参数文件
+        "camera_info_path": "config/camera/HSK_200W53_1080P.yaml"  // 相机标定参数文件
     },
 
     "Archive": {
@@ -310,7 +310,7 @@ apriltag_standalone/
 ├── configs.py               # 配置文件处理
 ├── config/                  # 配置目录
 │   ├── camera/              # 相机配置
-│   │   └── camera_info_1.yaml  # 相机参数
+│   │   └── HSK_200W53_1080P.yaml  # 相机参数
 │   └── vision/              # 视觉配置
 │       └── tags_36h11_all.json # AprilTag配置
 ├── README.md                # 说明文档

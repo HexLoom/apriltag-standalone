@@ -8,6 +8,7 @@
 import json
 import cv2
 import numpy as np
+import yaml
 
 def read_json(file_path):
     """读取JSON配置文件"""
@@ -16,11 +17,27 @@ def read_json(file_path):
 
 def read_camera_info(yaml_path):
     """从OpenCV YAML文件读取相机参数"""
-    fs = cv2.FileStorage(yaml_path, cv2.FILE_STORAGE_READ)
-    K = fs.getNode("K").mat()
-    D = fs.getNode("D").mat()
-    fs.release()
-    return K, D
+    try:
+        with open(yaml_path, 'r') as f:
+            data = yaml.safe_load(f)
+        
+        # 提取相机内参矩阵K
+        if 'camera_matrix' in data:
+            K_data = data['camera_matrix']['data']
+            K = np.array(K_data).reshape(3, 3)
+        else:
+            raise ValueError("相机参数文件中找不到camera_matrix")
+        
+        # 提取畸变系数D
+        if 'distortion_coefficients' in data:
+            D = np.array(data['distortion_coefficients']['data'])
+        else:
+            raise ValueError("相机参数文件中找不到distortion_coefficients")
+            
+        return K, D
+    except Exception as e:
+        print(f"读取相机参数文件失败: {e}")
+        raise
 
 class AprilTagConfig:
     def __init__(self, family, size, threads, max_hamming, z_up, decimate, blur, refine_edges, debug):
@@ -35,7 +52,7 @@ class AprilTagConfig:
         self.debug = debug
 
 class CameraConfig:
-    def __init__(self, device_id=0, width=1280, height=720, camera_info_path="config/camera/camera_info_1.yaml"):
+    def __init__(self, device_id=0, width=1280, height=720, camera_info_path="config/camera/HSK_200W53_1080P.yaml"):
         self.device_id = device_id           # 相机设备ID
         self.width = width                   # 相机宽度
         self.height = height                 # 相机高度
@@ -140,7 +157,7 @@ def create_default_configs():
         device_id=0,
         width=1280,
         height=720,
-        camera_info_path="config/camera/camera_info_1.yaml"
+        camera_info_path="config/camera/HSK_200W53_1080P.yaml"
     )
     
     # 默认桌面配置
