@@ -52,11 +52,15 @@ class AprilTagConfig:
         self.debug = debug
 
 class CameraConfig:
-    def __init__(self, device_id=0, width=1280, height=720, camera_info_path="config/camera/HSK_200W53_1080P.yaml"):
+    def __init__(self, device_id=0, width=1280, height=720, camera_info_path="config/camera/HSK_200W53_1080P.yaml",
+                undistort=True, keep_fov=True, alpha=0.85):
         self.device_id = device_id           # 相机设备ID
         self.width = width                   # 相机宽度
         self.height = height                 # 相机高度
         self.camera_info_path = camera_info_path  # 相机参数文件路径
+        self.undistort = undistort           # 是否校正畸变
+        self.keep_fov = keep_fov             # 是否保持视场角
+        self.alpha = alpha                   # 视场保留比例
 
 class ArchiveConfig:
     def __init__(self, enable, preview, save_raw, save_pred, preview_delay, path):
@@ -112,8 +116,23 @@ def load_config(config_path):
         # 加载AprilTag配置
         apriltag_config = AprilTagConfig(**config["AprilTagConfig"])
         
-        # 加载相机配置
-        camera_config = CameraConfig(**config.get("Camera", {}))
+        # 加载相机配置（确保处理未定义的参数）
+        camera_dict = config.get("Camera", {})
+        # 确保校正参数存在，使用默认值
+        if "undistort" not in camera_dict:
+            camera_dict["undistort"] = True
+        if "keep_fov" not in camera_dict:
+            camera_dict["keep_fov"] = True
+        if "alpha" not in camera_dict:
+            camera_dict["alpha"] = 0.85
+            
+        camera_config = CameraConfig(**camera_dict)
+        
+        # 打印相机校正信息
+        print(f"相机畸变校正: {'开启' if camera_config.undistort else '关闭'}")
+        if camera_config.undistort:
+            print(f"  - 视场保持: {'开启' if camera_config.keep_fov else '关闭'}")
+            print(f"  - 视场比例 alpha: {camera_config.alpha}")
         
         # 加载存档配置
         archive_config = ArchiveConfig(**config["Archive"])
@@ -157,7 +176,10 @@ def create_default_configs():
         device_id=0,
         width=1280,
         height=720,
-        camera_info_path="config/camera/HSK_200W53_1080P.yaml"
+        camera_info_path="config/camera/HSK_200W53_1080P.yaml",
+        undistort=True,        # 默认开启畸变校正
+        keep_fov=True,         # 默认保持视场角
+        alpha=0.85            # 默认视场比例
     )
     
     # 默认桌面配置

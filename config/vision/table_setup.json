@@ -15,7 +15,10 @@
         "device_id": 0,
         "width": 1920,
         "height": 1080,
-        "camera_info_path": "config/camera/HSK_200W53_1080P.yaml"
+        "camera_info_path": "config/camera/HSK_200W53_1080P.yaml",
+        "undistort": true,
+        "keep_fov": true,
+        "alpha": 0.85
     },
 
     "Archive": {
