@@ -2,6 +2,17 @@
 
 这是一个基于pupil-apriltags库的AprilTag识别工具包，用于摄像头中AprilTag的检测和跟踪。
 
+<!-- Keep these links. Translations will automatically update with the README. -->
+[Deutsch](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=de) | 
+[English](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=en) | 
+[Español](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=es) | 
+[français](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=fr) | 
+[日本語](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=ja) | 
+[한국어](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=ko) | 
+[Português](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=pt) | 
+[Русский](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=ru) | 
+[中文](https://www.readme-i18n.com/HexLoom/apriltag-standalone?lang=zh)
+
 ## 依赖库
 
 - Python 3.6+
